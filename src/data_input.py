@@ -1,3 +1,4 @@
+import sys
 import random
 import numpy as np
 import pandas as pd
@@ -12,7 +13,7 @@ def drop_exp(row,rate):
     row[idxs] = 0
     return row
 
-def load_data(net,type,nums,size=32,rate=0):
+def load_data(net,type,nums,size=32,rate=0,train_size=1):
 
     exp_path = "./data_evaluation/Benchmark Dataset/"+net+" Dataset/"+type+"/TFs+"+str(nums)+"/BL--ExpressionData.csv"
     geneids_path = "./data_evaluation/Benchmark Dataset/"+net+" Dataset/" + type + "/TFs+" + str(nums) + "/Target.csv"
@@ -43,10 +44,13 @@ def load_data(net,type,nums,size=32,rate=0):
     src_neg_ids = train[train['Label']==0]['TF'].values
     dst_neg_ids = train[train['Label']==0]['Target'].values
 
+    if(train_size > 1 or train_size < 0):
+        print("train_size out of bound")
+        sys.exit(1)
     indexs_pos = np.arange(len(src_pos_ids))
-    indexs_pos = np.random.choice(indexs_pos,int(len(src_pos_ids)*0.7),replace=False).tolist()
+    indexs_pos = np.random.choice(indexs_pos, int(len(src_pos_ids) * train_size),replace=False).tolist()
     indexs_neg = np.arange(len(src_neg_ids))
-    indexs_neg = np.random.choice(indexs_neg, int(len(src_neg_ids) * 0.7), replace=False).tolist()
+    indexs_neg = np.random.choice(indexs_neg, int(len(src_neg_ids) * train_size), replace=False).tolist()
 
     train_data = []
     train_data.append(src_pos_ids[indexs_pos].tolist())

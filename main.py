@@ -1,3 +1,6 @@
+import warnings
+warnings.filterwarnings("ignore")
+
 import torch
 import dgl.data
 import argparse
@@ -9,14 +12,16 @@ from src.graphModel import SAGEConv
 from src.data_input import load_data
 from sklearn.metrics import roc_auc_score,average_precision_score
 
+
+
 device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
-print("Device:", device)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_evaluation', type=str, default='mHSC-E', help='data_evaluation type',required=False)
 parser.add_argument('--net', type=str, default='Specific', help='network type',required=False)
 parser.add_argument('--num', type=int, default= 500, help='network scale',required=False)
-parser.add_argument('--rate',type=float,default=0,help=' the drop rate of scRNA ',required=False)
+parser.add_argument('--cell_size',type=float,default=0,help=' the drop rate of scRNA ',required=False)
+parser.add_argument('--train_size',type=float,default=1,help='',required=False)
 args = parser.parse_args()
 
 
@@ -76,10 +81,10 @@ def compute_auc(pos_score, neg_score):
 net = args.net
 type = args.data_evaluation
 num = args.num
-rate = args.rate
+cell_size = args.cell_size
 size = 32
 flatten_size = 512
-train_data,test_data,features,nums = load_data(net,type,num,size,rate)
+train_data,test_data,features,nums = load_data(net,type,num,size,cell_size,args.train_size)
 src_pos,dst_pos = train_data[0],train_data[1]
 
 train_g = dgl.graph((src_pos, dst_pos), num_nodes=nums)
@@ -109,7 +114,7 @@ test_neg_g = dgl.to_bidirected(test_neg_g)
 total_auc = []
 total_auprc = []
 
-for i in range(10):
+for i in range(1):
     model = GraphSAGE(train_g.ndata['feature'].shape[-1], 32)
     # 可以使用自定义的MLPPredictor代替DotPredictor
 
@@ -125,7 +130,7 @@ for i in range(10):
     model = model.to(device)
     pred = pred.to(device)
 
-    for e in range(300):
+    for e in range(1):
         # 前向传播
         h = model(train_g, train_g.ndata['feature'])
         pos_score = pred(train_pos_g, h)
@@ -160,7 +165,7 @@ total_auc = np.array(total_auc)
 total_auprc = np.array(total_auprc)
 auc = total_auc.mean()
 aupr = total_auprc.mean()
-print("{}_{}_{}_{},{},{}".format(net,type,num,rate,auc,aupr))
+print("%s,%s,%d,%.4f,%.4f,%.4f,%.4f" % (net,type,num,cell_size,args.train_size,auc,aupr))
 # df_auc = pd.DataFrame(total_auc)
 # df_aupr = pd.DataFrame(total_auprc)
 # df_auc.to_csv("./output/{}_{}_{}_auroc.csv".format(net,type,num))

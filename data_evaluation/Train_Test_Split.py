@@ -296,15 +296,15 @@ if __name__ == '__main__':
 
     density = Network_Statistic(data_type=data_type, net_scale=args.num, net_type=net_type)
     tmp = os.getcwd()
-    TF2file = os.getcwd() + '\\Benchmark Dataset\\' + net_type + ' Dataset\\' + data_type + '\\TFs+' + str(args.num) + '\\TF.csv'
-    Gene2file = os.getcwd() + '\\Benchmark Dataset\\' + net_type + ' Dataset\\' + data_type + '\\TFs+' + str(args.num) + '\\Target.csv'
-    label_file = os.getcwd() + '\\Benchmark Dataset\\' + net_type + ' Dataset\\' + data_type + '\\TFs+' + str(args.num) + '\\Label.csv'
+    TF2file = os.getcwd() + '/Benchmark Dataset/' + net_type + ' Dataset/' + data_type + '/TFs+' + str(args.num) + '/TF.csv'
+    Gene2file = os.getcwd() + '/Benchmark Dataset/' + net_type + ' Dataset/' + data_type + '/TFs+' + str(args.num) + '/Target.csv'
+    label_file = os.getcwd() + '/Benchmark Dataset/' + net_type + ' Dataset/' + data_type + '/TFs+' + str(args.num) + '/Label.csv'
 
-    train_set_file = os.getcwd() + '\\TrainTest\\' + net_type + '\\' + data_type + ' ' + str(args.num) + '\\Train_set.csv'
-    test_set_file = os.getcwd() + '\\TrainTest\\' + net_type + '\\' + data_type + ' ' + str(args.num)  + '\\Test_set.csv'
-    val_set_file = os.getcwd() + '\\TrainTest\\' + net_type + '\\' + data_type + ' ' + str(args.num) +  '\\Validation_set.csv'
+    train_set_file = os.getcwd() + '/TrainTest/' + net_type + '/' + data_type + ' ' + str(args.num) + '/Train_set.csv'
+    test_set_file = os.getcwd() + '/TrainTest/' + net_type + '/' + data_type + ' ' + str(args.num)  + '/Test_set.csv'
+    val_set_file = os.getcwd() + '/TrainTest/' + net_type + '/' + data_type + ' ' + str(args.num) +  '/Validation_set.csv'
 
-    path = os.getcwd() + '\\TrainTest\\' + net_type + '\\' + data_type + ' ' + str(args.num)
+    path = os.getcwd() + '/TrainTest/' + net_type + '/' + data_type + ' ' + str(args.num)
     if not os.path.exists(path):
         os.makedirs(path)
     if net_type == 'Specific':

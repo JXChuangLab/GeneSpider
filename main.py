@@ -22,17 +22,24 @@ parser.add_argument('--net', type=str, default='Specific', help='network type',r
 parser.add_argument('--num', type=int, default= 500, help='network scale',required=False)
 parser.add_argument('--cell_size',type=float,default=0,help=' the drop rate of scRNA ',required=False)
 parser.add_argument('--train_size',type=float,default=1,help='',required=False)
+parser.add_argument('--net_code',type=bool,default=False,help='',required=False)
 args = parser.parse_args()
 
 
 class GraphSAGE(nn.Module):
-    def __init__(self, in_feats, h_feats):
+    def __init__(self, in_feats, h_feats,netcode=False):
         super(GraphSAGE, self).__init__()
+        self.ennetcode = netcode
+        if netcode:
+            self.netcode = SAGEConv(in_feats,h_feats,'netcode',-1,-1,-1,bias=False)
         self.conv1 = SAGEConv(1,h_feats, 'mean',3,1,0,bias=False)
         self.conv2 = SAGEConv(h_feats, h_feats*2, 'mean',3,1,0,bias=False)
         self.conv3 = SAGEConv(h_feats*2, h_feats*4, 'mean',3,1,0,bias=False)
     def forward(self, g, in_feat):
-        h = self.conv1(g, in_feat)
+        h = in_feat
+        if self.ennetcode:
+            h = self.netcode(g,h)
+        h = self.conv1(g, h)
         h = F.relu(h)
         h = nn.MaxPool2d(2)(h)
         h = self.conv2(g, h)
@@ -82,12 +89,15 @@ net = args.net
 type = args.data_evaluation
 num = args.num
 cell_size = args.cell_size
+netcode = args.net_code
 size = 32
 flatten_size = 512
-train_data,test_data,features,nums = load_data(net,type,num,size,cell_size,args.train_size)
+train_data,test_data,features,nums = load_data(net,type,num,size,cell_size,args.train_size,netcode)
 src_pos,dst_pos = train_data[0],train_data[1]
 
 train_g = dgl.graph((src_pos, dst_pos), num_nodes=nums)
+if netcode:
+    features = features.values
 features_ = torch.from_numpy(features)
 features_ = features_.to(torch.float32)
 train_g = dgl.to_bidirected(train_g)
@@ -114,8 +124,8 @@ test_neg_g = dgl.to_bidirected(test_neg_g)
 total_auc = []
 total_auprc = []
 
-for i in range(1):
-    model = GraphSAGE(train_g.ndata['feature'].shape[-1], 32)
+for i in range(10):
+    model = GraphSAGE(train_g.ndata['feature'].shape[-1], 32,netcode=netcode)
     # 可以使用自定义的MLPPredictor代替DotPredictor
 
     pred = MLPPredictor(flatten_size,218)  # [32,512]  [64,4608]
@@ -130,7 +140,7 @@ for i in range(1):
     model = model.to(device)
     pred = pred.to(device)
 
-    for e in range(1):
+    for e in range(300):
         # 前向传播
         h = model(train_g, train_g.ndata['feature'])
         pos_score = pred(train_pos_g, h)

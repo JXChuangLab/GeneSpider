@@ -20,7 +20,7 @@ class SAGEConv(nn.Module):
                  norm=None,
                  activation=None):
         super(SAGEConv, self).__init__()
-        valid_aggre_types = {'mean', 'gcn', 'pool', 'lstm'}
+        valid_aggre_types = {'netcode','mean', 'gcn', 'pool', 'lstm'}
         if aggregator_type not in valid_aggre_types:
             raise DGLError(
                 'Invalid aggregator_type. Must be one of {}. '
@@ -34,16 +34,19 @@ class SAGEConv(nn.Module):
         self.feat_drop = nn.Dropout(feat_drop)
         self.activation = activation
         # aggregator type: mean/pool/lstm/gcn
+        if aggregator_type == 'netcode':
+            self.net = nn.Linear(self._in_src_feats,1024)
         if aggregator_type == 'pool':
             self.fc_pool = nn.Linear(self._in_src_feats, self._in_src_feats)
         if aggregator_type == 'lstm':
             self.lstm = nn.LSTM(self._in_src_feats, self._in_src_feats, batch_first=True)
-        if aggregator_type != 'gcn':
+        if aggregator_type != 'gcn' and aggregator_type != 'netcode':
             #self.fc_self = nn.Linear(self._in_dst_feats, out_feats, bias=False)
             self.fc_self = nn.Conv2d(in_channels=self._in_dst_feats,out_channels=out_feats,kernel_size=kernel_size,stride=stride,padding=padding)
 
         #self.fc_neigh = nn.Linear(self._in_src_feats, out_feats, bias=False)
-        self.fc_neigh = nn.Conv2d(in_channels=self._in_dst_feats, out_channels=out_feats, kernel_size=kernel_size,
+        if aggregator_type != 'netcode':
+            self.fc_neigh = nn.Conv2d(in_channels=self._in_dst_feats, out_channels=out_feats, kernel_size=kernel_size,
                                  stride=stride, padding=padding)
         if bias:
             self.bias = nn.parameter.Parameter(torch.zeros(self._out_feats))
@@ -53,13 +56,16 @@ class SAGEConv(nn.Module):
 
     def reset_parameters(self):
         gain = nn.init.calculate_gain('relu')
+        if self._aggre_type == 'netcode':
+            nn.init.xavier_uniform_(self.net.weight,gain=gain)
         if self._aggre_type == 'pool':
             nn.init.xavier_uniform_(self.fc_pool.weight, gain=gain)
         if self._aggre_type == 'lstm':
             self.lstm.reset_parameters()
-        if self._aggre_type != 'gcn':
+        if self._aggre_type != 'gcn' and self._aggre_type != 'netcode':
             nn.init.xavier_uniform_(self.fc_self.weight, gain=gain)
-        nn.init.xavier_uniform_(self.fc_neigh.weight, gain=gain)
+        if self._aggre_type != 'netcode':
+            nn.init.xavier_uniform_(self.fc_neigh.weight, gain=gain)
 
 
     def _compatibility_check(self):
@@ -146,6 +152,8 @@ class SAGEConv(nn.Module):
                 graph.srcdata['h'] = feat_src
                 graph.update_all(msg_fn, self._lstm_reducer)
                 h_neigh = self.fc_neigh(graph.dstdata['neigh'])
+            elif self._aggre_type == 'netcode':
+                graph.srcdata['h'] = F.relu(self.net(feat_src))
             else:
                 raise KeyError('Aggregator type {} not recognized.'.format(self._aggre_type))
 
@@ -153,6 +161,9 @@ class SAGEConv(nn.Module):
             if self._aggre_type == 'gcn':
                 rst = h_neigh #--原始代码
                 #rst = self.fc_self(h_self) + h_neigh #--新增代码
+            elif self._aggre_type == 'netcode':
+                rst = graph.srcdata['h']
+                rst = rst.view(-1,1,32,32)
             else:
                 rst = self.fc_self(h_self) + h_neigh
 

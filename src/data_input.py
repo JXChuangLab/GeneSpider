@@ -13,7 +13,7 @@ def drop_exp(row,rate):
     row[idxs] = 0
     return row
 
-def load_data(net,type,nums,size=32,rate=0,train_size=1):
+def load_data(net,type,nums,size=32,rate=0,train_size=1,netcode=False):
 
     exp_path = "./data_evaluation/Benchmark Dataset/"+net+" Dataset/"+type+"/TFs+"+str(nums)+"/BL--ExpressionData.csv"
     geneids_path = "./data_evaluation/Benchmark Dataset/"+net+" Dataset/" + type + "/TFs+" + str(nums) + "/Target.csv"
@@ -34,10 +34,10 @@ def load_data(net,type,nums,size=32,rate=0,train_size=1):
     features = genes_ids['Gene'].values.tolist()
 
     features = exp.loc[features]
-
-    gas = GramianAngularField(image_size=size, method='d')
-    features = gas.fit_transform(features)
-    features = np.expand_dims(features, axis=1)
+    if netcode == False:
+        gas = GramianAngularField(image_size=size, method='d')
+        features = gas.fit_transform(features)
+        features = np.expand_dims(features, axis=1)
 
     src_pos_ids = train[train['Label']==1]['TF'].values
     dst_pos_ids = train[train['Label']==1]['Target'].values

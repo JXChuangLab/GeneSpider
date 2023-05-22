@@ -14,6 +14,7 @@ def caculate(net,type,num):
 
     TFs = set(data['TF'].values.tolist())
     TFs = len(TFs)
+    data = data[data['Label']==1]
     pairs = len(data)
     print("%s,%s,%s,%d,%d" % (net,type,num,TFs,pairs))
 print("network,type,num,TFs,pairs")

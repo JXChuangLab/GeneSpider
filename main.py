@@ -9,9 +9,9 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 from src.graphModel import SAGEConv
-from src.data_input import load_data
-from sklearn.metrics import roc_auc_score,average_precision_score
-
+from src.data_input import load_data,load_breast_cancer
+from sklearn.metrics import roc_auc_score,average_precision_score,accuracy_score
+import matplotlib.pyplot as plt
 
 
 device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
@@ -39,6 +39,10 @@ class GraphSAGE(nn.Module):
         h = in_feat
         if self.ennetcode:
             h = self.netcode(g,h)
+        # tmp = h.cpu().detach().numpy()
+        # tmp = tmp[0,0,:,:]
+        # plt.imshow(tmp)
+        # plt.show()
         h = self.conv1(g, h)
         h = F.relu(h)
         h = nn.MaxPool2d(2)(h)
@@ -82,6 +86,7 @@ def compute_auc(pos_score, neg_score):
     scores = torch.cat([pos_score, neg_score]).numpy()
     labels = torch.cat(
         [torch.ones(pos_score.shape[0]), torch.zeros(neg_score.shape[0])]).numpy()
+    # acc = accuracy_score()
     return roc_auc_score(labels, scores),average_precision_score(labels,scores)
 
 
@@ -92,7 +97,8 @@ cell_size = args.cell_size
 netcode = args.net_code
 size = 32
 flatten_size = 512
-train_data,test_data,features,nums = load_data(net,type,num,size,cell_size,args.train_size,netcode)
+#train_data,test_data,features,nums = load_data(net,type,num,size,cell_size,args.train_size,netcode)
+train_data,test_data,features,nums,id_to_genes = load_breast_cancer()
 src_pos,dst_pos = train_data[0],train_data[1]
 
 train_g = dgl.graph((src_pos, dst_pos), num_nodes=nums)
@@ -108,8 +114,13 @@ train_g.ndata['feature'] = features_
 train_pos_u, train_pos_v = src_pos,dst_pos
 train_neg_u, train_neg_v = train_data[2],train_data[3]
 
+min_len = min(len(test_data[0]),len(test_data[2]))
+index = np.arange(0,min_len,dtype=int)
+
 test_pos_u, test_pos_v = test_data[0],test_data[1]
 test_neg_u, test_neg_v = test_data[2],test_data[3]
+
+
 
 train_pos_g = dgl.graph((train_pos_u, train_pos_v), num_nodes=train_g.number_of_nodes())
 train_pos_g = dgl.to_bidirected(train_pos_g)
@@ -117,14 +128,14 @@ train_neg_g = dgl.graph((train_neg_u, train_neg_v), num_nodes=train_g.number_of_
 train_neg_g = dgl.to_bidirected(train_neg_g)
 
 test_pos_g = dgl.graph((test_pos_u, test_pos_v), num_nodes=train_g.number_of_nodes())
-test_pos_g = dgl.to_bidirected(test_pos_g)
+#test_pos_g = dgl.to_bidirected(test_pos_g)
 test_neg_g = dgl.graph((test_neg_u, test_neg_v), num_nodes=train_g.number_of_nodes())
-test_neg_g = dgl.to_bidirected(test_neg_g)
+#test_neg_g = dgl.to_bidirected(test_neg_g)
 
 total_auc = []
 total_auprc = []
 
-for i in range(10):
+for i in range(1):
     model = GraphSAGE(train_g.ndata['feature'].shape[-1], 32,netcode=netcode)
     # 可以使用自定义的MLPPredictor代替DotPredictor
 
@@ -140,7 +151,7 @@ for i in range(10):
     model = model.to(device)
     pred = pred.to(device)
 
-    for e in range(300):
+    for e in range(20): #300
         # 前向传播
         h = model(train_g, train_g.ndata['feature'])
         pos_score = pred(train_pos_g, h)
@@ -151,6 +162,7 @@ for i in range(10):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        print("epochs{} loss {}".format(e, loss))
         # if(loss<0.5):
         #     break;
         # if e % 5 == 0:
@@ -160,16 +172,32 @@ for i in range(10):
         #         auc = compute_auc(pos_score, neg_score)
         #         print("epochs{} AUC: {}".format(e, auc))
 
-    # 检测结果准确
 
+    # breast cancer 预测
     with torch.no_grad():
-        #h = model(train_g, train_g.ndata['feature'])
+        h = model(train_g, train_g.ndata['feature'])
         pos_score = pred(test_pos_g, h)
-        neg_score = pred(test_neg_g, h)
-        auc,aupr = compute_auc(pos_score, neg_score)
-        total_auc.append(auc)
-        total_auprc.append(aupr)
-        #print("{} {} {} AUC: {}  AUPR{}".format(net,type,num,auc,aupr))
+        pos_score = pos_score.to('cpu').numpy()
+        pos_score[np.where(pos_score > 0.5)] = 1
+        pos_score[np.where(pos_score <= 0.5)] = 0
+
+        label = np.ones((len(pos_score)))
+        print("Acc: {}".format(accuracy_score(label,pos_score)))
+
+        tfs = test_pos_g.edges()
+        tfs = tfs[0].to('cpu').numpy()
+        tfs = id_to_genes.loc[tfs]
+        tfs = tfs['genes'].drop_duplicates()
+        tfs.to_csv("TFs.csv")
+    # 检测结果准确
+    # with torch.no_grad():
+    #     #h = model(train_g, train_g.ndata['feature'])
+    #     pos_score = pred(test_pos_g, h)
+    #     neg_score = pred(test_neg_g, h)
+    #     auc,aupr = compute_auc(pos_score, neg_score)
+    #     total_auc.append(auc)
+    #     total_auprc.append(aupr)
+    #     #print("{} {} {} AUC: {}  AUPR{}".format(net,type,num,auc,aupr))
 
 total_auc = np.array(total_auc)
 total_auprc = np.array(total_auprc)

@@ -153,7 +153,7 @@ class SAGEConv(nn.Module):
                 graph.update_all(msg_fn, self._lstm_reducer)
                 h_neigh = self.fc_neigh(graph.dstdata['neigh'])
             elif self._aggre_type == 'netcode':
-                graph.srcdata['h'] = F.relu(self.net(feat_src))
+                graph.srcdata['h'] = self.net(feat_src)
             else:
                 raise KeyError('Aggregator type {} not recognized.'.format(self._aggre_type))
 
